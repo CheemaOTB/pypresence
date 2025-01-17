@@ -4,7 +4,6 @@ import json
 import os
 import struct
 import sys
-import tempfile
 from typing import Union, Optional
 
 # TODO: Get rid of this import * lol
@@ -34,6 +33,7 @@ class BaseClient:
         self.sock_writer: Optional[asyncio.StreamWriter] = None
 
         self.client_id = client_id
+        self.user_data = None  # Initialize the user ID
 
         if handler is not None:
             if not inspect.isfunction(handler):
@@ -129,3 +129,12 @@ class BaseClient:
             raise DiscordError(data['code'], data['message'])
         if self._events_on:
             self.sock_reader.feed_data = self.on_event
+
+        await self.fetch_user_data()  
+
+    async def fetch_user_data(self):
+        self.send_data(1, {"cmd": "SUBSCRIBE", "evt": "CURRENT_USER_UPDATE", "nonce": "current_user"})
+        data = await self.read_output()
+        self.user_data = data["data"]
+
+ 
