@@ -1,13 +1,13 @@
 import json
 import os
 import time
-import sys
 
 from .baseclient import BaseClient
 from .payloads import Payload
 from .utils import remove_none, get_event_loop
-from .types import ActivityType
 
+
+from .baseclient import BaseClient  # Assuming the BaseClient is in baseclient.py
 
 class Presence(BaseClient):
 
@@ -15,7 +15,6 @@ class Presence(BaseClient):
         super().__init__(*args, **kwargs)
 
     def update(self, pid: int = os.getpid(),
-               activity_type: ActivityType = None,
                state: str = None, details: str = None,
                start: int = None, end: int = None,
                large_image: str = None, large_text: str = None,
@@ -26,8 +25,8 @@ class Presence(BaseClient):
                instance: bool = True, payload_override: dict = None):
 
         if payload_override is None:
-            payload = Payload.set_activity(pid=pid, activity_type=activity_type, state=state, details=details,
-                                           start=start, end=end, large_image=large_image, large_text=large_text,
+            payload = Payload.set_activity(pid=pid, state=state, details=details, start=start, end=end,
+                                           large_image=large_image, large_text=large_text,
                                            small_image=small_image, small_text=small_text, party_id=party_id,
                                            party_size=party_size, join=join, spectate=spectate,
                                            match=match, buttons=buttons, instance=instance, activity=True)
@@ -44,12 +43,17 @@ class Presence(BaseClient):
     def connect(self):
         self.update_event_loop(get_event_loop())
         self.loop.run_until_complete(self.handshake())
+        self.loop.run_until_complete(self.fetch_user_data())
 
     def close(self):
         self.send_data(2, {'v': 1, 'client_id': self.client_id})
+        self.sock_writer.close()
         self.loop.close()
-        if sys.platform == 'win32' or sys.platform == 'win64':
-            self.sock_writer._call_connection_lost(None)
+
+    def user(self):
+        if self.user_data is None:
+            raise Exception("User ID has not been fetched yet. Ensure you are connected first.")
+        return self.user_data
 
 
 class AioPresence(BaseClient):
@@ -58,7 +62,6 @@ class AioPresence(BaseClient):
         super().__init__(*args, **kwargs, isasync=True)
 
     async def update(self, pid: int = os.getpid(),
-                     activity_type: ActivityType = None,
                      state: str = None, details: str = None,
                      start: int = None, end: int = None,
                      large_image: str = None, large_text: str = None,
@@ -67,8 +70,8 @@ class AioPresence(BaseClient):
                      join: str = None, spectate: str = None,
                      match: str = None, buttons: list = None,
                      instance: bool = True):
-        payload = Payload.set_activity(pid=pid, activity_type=activity_type, state=state, details=details,
-                                       start=start, end=end, large_image=large_image, large_text=large_text,
+        payload = Payload.set_activity(pid=pid, state=state, details=details, start=start, end=end,
+                                       large_image=large_image, large_text=large_text,
                                        small_image=small_image, small_text=small_text, party_id=party_id,
                                        party_size=party_size, join=join, spectate=spectate,
                                        match=match, buttons=buttons, instance=instance, activity=True)
@@ -86,6 +89,5 @@ class AioPresence(BaseClient):
 
     def close(self):
         self.send_data(2, {'v': 1, 'client_id': self.client_id})
+        self.sock_writer.close()
         self.loop.close()
-        if sys.platform == 'win32' or sys.platform == 'win64':
-            self.sock_writer._call_connection_lost(None)
